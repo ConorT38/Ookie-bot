@@ -2,13 +2,14 @@ import requests
 import re
 import time
 import asyncio
+import uuid
 from log.Logger import Logger
 
 fullLinkQuery = r"(?i)\b((?<=href\=\")(?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'\".,<>?«»“”‘’])(?=\"))"
 currentSiteLinkQuery = r"(?i)\b((?<=href\=\"\/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'\".,<>?«»“”‘’])(?=\"))"
 siteDomainQuery = r"(https?:\/\/|www\d{0,3}[.])(.*?\/)"
 
-startingSite = "https://bbc.co.uk"
+startingSite = "https://en.wikipedia.org"
 conn_timeout = 6
 read_timeout = 20
 
@@ -16,29 +17,53 @@ visitedSites = {}
 sitesToVisit = [startingSite]
 
 async def processLinks(source):
-    print("collecting source: "+source)
+    # get html
+    # load html into file line-by-line
+    # read new file line by line
+    # check for url on each line
+    # site name | seen_online| url_safety 
+    # facebook.com | 1,000,000 | facebook.com/search/q?=hi
+    # facebook.com/user/conor.thompson | 4
+    # spacebook.com 
+
+    # search = facebook.com 
+    # result:
+    #       https://facebook.com (because it's )
+    #       
+    Logger.debug("main", "collecting source: "+source)
 
     timeouts = (conn_timeout, read_timeout)
-    headers = {'User- Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36' }
+    #headers = {'User- Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36' }
     
-    content = requests.get(source, headers=headers, timeout=timeouts).text
-    title = re.search('<\W*title\W*(.*)</title', content, re.IGNORECASE)
-    Logger.debug("main", "request response - ok")
-
-    await splitMatching(source, content, 10)
+    # grab html content from web page
+    content = requests.get(source, timeout=timeouts).text
+    
+    #Logger.debug("main", content)
+    # write html response to a file (to be read line-by-line)
+    # this will be multi-threaded so we need different file name each time
+    # to avoid locking etc.
+    threadFileName = str(uuid.uuid4())+".html"
+    with open(threadFileName, "w", encoding="utf-8", newline="\n") as tmpFile:
+        for line in content:
+            tmpFile.write(line)
+    
+    title = ""
+    # we need to read the tmpFile line-by-line and check for urls, title, etc.
+    for line in open(threadFileName, "r", encoding="utf-8", newline="\n").readlines():
+        if not title:
+            title = re.search('<\W*title\W*(.*)</title', line, re.IGNORECASE)
+        await getUrlMatches(source, line, "mainThreadWillChangeLater")
     return title
 
-async def splitMatching(source, data, numThreads):
-    chunkSize = len(data) // numThreads
-    chunks = [data[i : i + chunkSize] for i in range(0, len(data), chunkSize)]
-    for idx in range(numThreads):
-        try:
-            await addCurrentSiteLinkMatch(source, fullLinkQuery, chunks[idx], str(idx))
-            await addFullLinkMatch(currentSiteLinkQuery, chunks[idx], str(idx))
-        except BaseException as error:
-            raise
+# for each line in the file, we need to check if it has a url
+async def getUrlMatches(source, line, threadId):
+    try:
+        await addCurrentSiteLinkMatch(source,  line, threadId)
+        await addFullLinkMatch(line, threadId)
+    except BaseException as error:
+        raise
 
-async def addFullLinkMatch(query, data, threadId):
+async def addFullLinkMatch( data, threadId):
     Logger.debug(threadId, "data size: "+str(len(data)))
     
     fullLinkMatches = re.findall(fullLinkQuery, data)
@@ -51,7 +76,7 @@ async def addFullLinkMatch(query, data, threadId):
             Logger.info(threadId, "[queue]: "+site)
     Logger.info(threadId, "Total number of sites matched: "+str(len(fullLinkMatches)))
 
-async def addCurrentSiteLinkMatch(source, query, data, threadId):
+async def addCurrentSiteLinkMatch(source,  data, threadId):
     Logger.debug(threadId, "data size: "+str(len(data)))
 
     currentSiteLinkMatches = re.findall(currentSiteLinkQuery, data)
