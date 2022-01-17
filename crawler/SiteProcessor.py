@@ -1,72 +1,73 @@
 import sys
+import os
+import uuid
+import json
+
+import pika
+import asyncio
+import requests
+
+from crawler.SiteMatcher import SiteMatcher
+
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 from log.Logger import Logger
 
-fullLinkQuery = r"(?i)\b((?<=href\=\")(?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'\".,<>?«»“”‘’])(?=\"))"
-currentSiteLinkQuery = r"(?i)\b((?<=href\=\"\/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'\".,<>?«»“”‘’])(?=\"))"
-siteDomainQuery = r"(https?:\/\/|www\d{0,3}[.])(.*?\/)"
-
-startingSite = "https://bbc.co.uk"
 conn_timeout = 6
 read_timeout = 20
+credentials = pika.PlainCredentials("root","Ae27!6CdJc1_thEQ9")
+connection = pika.BlockingConnection(pika.ConnectionParameters('192.168.0.22',5672,'/', credentials))
+channel = connection.channel()
+channel.queue_declare(queue='sitesQueue')
 
 class SiteProcessor:
-    def __init__(self, visitedSites = {}, numberOfThreads = 1):
+    def __init__(self, sourceSite, visitedSites = {}, threadId="main"):
         self.visitedSites = visitedSites
-        self.numberOfThreads = numberOfThreads
-    
-    async def processLinks(source):
-        print("collecting source: "+source)
+        self.sourceSite = sourceSite
+        self.sitesToVisit = []
+        self.threadId = threadId
+        self.logger = Logger(threadId)
+        self.siteMatcher = SiteMatcher(threadId)
 
-        timeouts = (conn_timeout, read_timeout)
-        headers = {'User- Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36' }
+    async def Process(self, _timeout=(6, 20)):
+        content = requests.get(self.sourceSite, timeout=_timeout).text
+
+        tmpFilePath = self.CreateFileFromResponse(content)
         
-        content = requests.get(source, headers=headers, timeout=timeouts).text
-        title = re.search('<\W*title\W*(.*)</title', content, re.IGNORECASE)
-        Logger.debug("main", "request response - ok")
+        title = ""
+        # we need to read the tmpFile line-by-line and check for urls, title, etc.
+        for line in open(tmpFilePath, "r", encoding="utf-8", newline="\n").readlines():
+            if not title:
+                title = await self.siteMatcher.GetSiteTitleMatch(line)
+            await self.GetUrlMatches(line)
+        
+        queueMessage = json.dumps({"title": title, "url": self.sourceSite})
+        channel.basic_publish(exchange='',
+                      routing_key='sitesQueue',
+                      body=queueMessage)
+            
+        os.remove(tmpFilePath)
 
-        await splitMatching(source, content, 10)
-        return title
+    async def FlushSitesToVisit(self):
+        results = self.sitesToVisit
+        self.sitesToVisit = []
+        return results
 
-async def splitMatching(self, source, data, numThreads):
-    chunkSize = len(data) // numThreads
-    chunks = [data[i : i + chunkSize] for i in range(0, len(data), chunkSize)]
-    for idx in range(numThreads):
+    async def GetUrlMatches(self, data):
         try:
-            await addCurrentSiteLinkMatch(source, fullLinkQuery, chunks[idx], str(idx))
-            await addFullLinkMatch(currentSiteLinkQuery, chunks[idx], str(idx))
+            currentSiteMatches = await self.siteMatcher.GetCurrentSiteLinkMatches(data, self.sourceSite, self.visitedSites)
+            fullLinkMatches = await self.siteMatcher.GetFullLinkMatches(data, self.visitedSites)
+
+            self.sitesToVisit.extend(currentSiteMatches)
+            self.sitesToVisit.extend(fullLinkMatches)
         except BaseException as error:
             raise
 
-async def addFullLinkMatch(self, query, data, threadId):
-    Logger.debug(threadId, "data size: "+str(len(data)))
-    
-    fullLinkMatches = re.findall(fullLinkQuery, data)
-    Logger.debug(threadId, "full link match finished")
-
-    for fullLink in fullLinkMatches:
-        site = fullLink[0]
-        if site not in self.visitedSites:
-            self.sitesToVisit.append(site)
-            Logger.info(threadId, "[queue]: "+site)
-    Logger.info(threadId, "Total number of sites matched: "+str(len(fullLinkMatches)))
-
-async def addCurrentSiteLinkMatch(source, query, data, threadId):
-    Logger.debug(threadId, "data size: "+str(len(data)))
-
-    currentSiteLinkMatches = re.findall(currentSiteLinkQuery, data)
-    Logger.debug(threadId, source + " current link match finished")
-
-    for currentSiteLink in currentSiteLinkMatches:
-        if source.count("/") > 2:
-            siteDomainMatch = re.search(siteDomainQuery, source)
-            site = ''.join(siteDomainMatch.groups(0))+currentSiteLink[0]
-            if site not in visitedSites:
-                sitesToVisit.append(site)
-                Logger.info(threadId, "[queue]: "+site)
-        else:
-            site = source+"/"+currentSiteLink[0]
-            if site not in visitedSites:
-                sitesToVisit.append(site)
-                Logger.info(threadId, "[queue]: "+site)
-    Logger.info(threadId, "Total number of sites matched: "+str(len(currentSiteLinkMatches)))
+    def CreateFileFromResponse(self, data):
+        # write html response to a file (to be read line-by-line)
+        # this will be multi-threaded so we need different file name each time
+        # to avoid locking etc.
+        tmpFileName = str(uuid.uuid4())+".html"
+        with open(tmpFileName, "w", encoding="utf-8", newline="\n") as tmpFile:
+            for line in data:
+                tmpFile.write(line)
+        return tmpFileName
