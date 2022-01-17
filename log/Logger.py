@@ -1,12 +1,23 @@
+from datetime import datetime
+
 class Logger:
-    @staticmethod
-    def info(logId, message):
-        print("[INFO]["+logId+"] "+message)
+    def __init__(self, threadId="main"):
+        self.threadId=threadId
+        
+    def info(self, message, logId=""):
+        if not logId:
+            logId = self.threadId
+        print(self.getTimeStamp() + "[INFO]["+logId+"] "+message)
     
-    @staticmethod
-    def debug(logId, message):
-        print("[DEBUG]["+logId+"] "+message)
+    def debug(self, message, logId=""):
+        if not logId:
+            logId = self.threadId
+        print(self.getTimeStamp() + "[DEBUG]["+logId+"] "+message)
     
-    @staticmethod
-    def error(logId, message):
-        print("[ERROR]["+logId+"] "+message)
+    def error(self, message, logId=""):
+        if not logId:
+            logId = self.threadId
+        print(self.getTimeStamp() + "[ERROR]["+logId+"] "+message)
+    
+    def getTimeStamp(self):
+        return "["+str(datetime.now().strftime('%d-%m-%Y %H:%M:%S'))+"]"
