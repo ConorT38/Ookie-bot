@@ -6,21 +6,20 @@ from log.Logger import Logger
 import asyncio
 from concurrent.futures.thread import ThreadPoolExecutor
 
-startingSites = ["https://www.quantstart.com/","https://reddit.com","https://en.wikipedia.org"]
+startingSites = ["https://youtube.com","https://reddit.com","https://en.wikipedia.org"]
 
 visitedSites = {}
 async def StartProcessing(startingSite, threadId):
     sitesToVisit = [startingSite]
     sitesVisited = 0
-    while sitesVisited < 300 or len(sitesToVisit) > 0:
+    while sitesToVisit:
         if not sitesToVisit:
             continue
 
         startTime = time.time()
         site = sitesToVisit.pop(0)
 
-        if Utils.isExcludedFileType(site):
-            Logger(threadId).error(site)
+        if Utils.isExcludedFileType(site) or site in visitedSites:
             continue
         
         siteProcessor = SiteProcessor(site, visitedSites,threadId)
