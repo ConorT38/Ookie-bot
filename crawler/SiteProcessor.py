@@ -60,6 +60,7 @@ class SiteProcessor:
             self.sitesToVisit.extend(currentSiteMatches)
             self.sitesToVisit.extend(fullLinkMatches)
         except BaseException as error:
+            self.logger.error("Something went wrong getting urls for --["+data+"].")
             raise
 
     def CreateFileFromResponse(self, data):

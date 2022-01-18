@@ -13,6 +13,7 @@ class SiteMatcher:
         self.logger = Logger(threadId)
 
     async def GetCurrentSiteLinkMatches(self, data, sourceSite, visitedSites):
+        self.logger.debug("parsing sites for "+data)
         currentSiteLinkMatches = re.findall(Queries.CURRENT_SITE_LINK, data)
         sitesToVisit = []
 
