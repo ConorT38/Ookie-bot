@@ -61,7 +61,4 @@ class SiteProcessor:
                           routing_key='sitesQueue',
                           body=message)
         except:
-            credentials = pika.PlainCredentials("root","Ae27!6CdJc1_thEQ9")
-            connection = pika.BlockingConnection(pika.ConnectionParameters('192.168.0.22',5672,'/', credentials))
-            channel = connection.channel()
-            channel.queue_declare(queue='sitesQueue')
+            self.logger.error("AMQP Channel connection failed.")

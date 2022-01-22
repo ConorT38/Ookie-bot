@@ -11,14 +11,15 @@ class SiteMatcher:
         self.logger = Logger(threadId)
 
     def GetFullSiteURL(self, href, sourceSite):
-        if href[0] == "#":
+        if not href or href[0] == "#":
             return sourceSite
         href = href.strip()
         siteDomain = sourceSite.strip()
         if siteDomain.count('/') >  2:
             siteDomainArr = sourceSite.split("/",3)
             if siteDomainArr[0].lower() not in ["http:", "https:"]:
-                return ""
+                self.logger.debug("this is not a website -- "+siteDomainArr[0])
+                return
             siteDomain = siteDomainArr[0] + "//" + siteDomainArr[2].strip()
         
         if href[0] == '/':
