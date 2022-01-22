@@ -1,15 +1,13 @@
-import threading
+from multiprocessing import Pool
 import time
 from crawler.SiteProcessor import SiteProcessor
 from crawler.Utils import Utils
 from log.Logger import Logger
-import asyncio
-from concurrent.futures.thread import ThreadPoolExecutor
-
-startingSites = ["https://youtube.com","https://reddit.com","https://en.wikipedia.org"]
+import sys
+from urllib.parse import urlparse
 
 visitedSites = {}
-async def StartProcessing(startingSite, threadId):
+def StartProcessing(startingSite, threadId):
     sitesToVisit = [startingSite]
     sitesVisited = 0
     while sitesToVisit:
@@ -19,29 +17,35 @@ async def StartProcessing(startingSite, threadId):
         startTime = time.time()
         site = sitesToVisit.pop(0)
 
-        if Utils.isExcludedFileType(site) or site in visitedSites:
-            continue
         
-        siteProcessor = SiteProcessor(site, visitedSites,threadId)
-        await siteProcessor.Process()
+        siteProcessor = SiteProcessor(site, visitedSites, threadId)
+        siteProcessor.Process()
     
-        sitesToVisit.extend(await siteProcessor.FlushSitesToVisit())
+        sitesToVisit.extend(siteProcessor.FlushSitesToVisit())
         sitesVisited += 1
         
         Logger(threadId).info("Site: "+site+"\nSitesVisited: "+str(sitesVisited)+", Total Time: "+str(time.time()-startTime))
+    print(sitesToVisit)
     
 
-async def main():
-    loop = asyncio.get_event_loop()
-    executor = ThreadPoolExecutor(max_workers=4)
-    siteEnum = enumerate(startingSites)
+def main(startingSites):
+    pool = Pool(3)
+    try:
+        for i in range(3):
+            pool.apply_async(StartProcessing(startingSites[i], "thread-" + str(i)))
+    except KeyboardInterrupt:
+        pool.terminate()
+        sys.exit(1)
 
-    futures = [loop.run_in_executor(executor, asyncio.ensure_future(StartProcessing(site, "thread-" + str(id))), id) for id, site in siteEnum]
-    
-    await asyncio.gather(futures)
     Logger().info("Finished...")
 
-asyncio.run(main())
+if __name__ == '__main__':
+    if len(sys.argv) < 2:
+        raise Exception("Inavlid argument. Usage: ookiebot.py <url>")
+    for arg in sys.argv[1:]:
+        parsedUrl = urlparse(str(arg))
+        if not all([parsedUrl.scheme, parsedUrl.netloc]):
+            raise Exception("Inavlid argument. Usage: ookiebot.py <url>")
 
-    
+    main(sys.argv[1:])
     

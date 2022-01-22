@@ -1,3 +1,4 @@
 requests==2.26.0
 asyncio==3.4.3
 pika==1.2.0
+beautifulsoup4==4.10.0
