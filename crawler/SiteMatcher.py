@@ -24,13 +24,15 @@ class SiteMatcher:
         
         # absolute url path (e.g. https://google.com/source/link, "/about/project" -> https://google.com/about/project)
         if href[0] == '/':
-            if siteDomain[:-1] == '/':
+            if href[1] == '/':
+                return "https://" + href[2:]
+            if siteDomain[-1] == '/':
                 return siteDomain + href[1:]
             return siteDomain + href
 
         # relative url path (e.g. https://google.com/source/link, "/about/" -> https://google.com/source/link/about/)
         if href[:4] != "http":
-            if sourceSite[:-1] == '/':
+            if sourceSite[-1] == '/':
                 return sourceSite + href
             return sourceSite + "/" + href
 

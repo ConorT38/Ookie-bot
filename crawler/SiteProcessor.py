@@ -1,13 +1,13 @@
-import sys
-import os
-import uuid
 import json
+import logging
+import os
+import sys
+import uuid
 
 import pika
-import logging
-from selenium.webdriver.remote.remote_connection import LOGGER
 from bs4 import BeautifulSoup
 from selenium import webdriver
+from selenium.webdriver.remote.remote_connection import LOGGER
 
 from crawler.SiteMatcher import SiteMatcher
 from crawler.Utils import Utils
@@ -58,6 +58,9 @@ class SiteProcessor:
             content = browser.page_source
             soup = BeautifulSoup(content, 'html.parser')
             title = soup.find('title').string
+
+            if "404" in title:
+                return None
 
             for link in soup.find_all(href=True):
                 if link.has_attr('href'):
