@@ -29,9 +29,9 @@ def StartProcessing(startingSite, threadId):
     
 
 def main(startingSites):
-    pool = Pool(3)
+    pool = Pool(len(startingSites))
     try:
-        for i in range(3):
+        for i in range(len(startingSites)):
             pool.apply_async(StartProcessing(startingSites[i], "thread-" + str(i)))
     except KeyboardInterrupt:
         pool.terminate()
