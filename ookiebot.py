@@ -24,9 +24,7 @@ def StartProcessing(startingSite, threadId):
         sitesToVisit.extend(siteProcessor.FlushSitesToVisit())
         sitesVisited += 1
         
-        Logger(threadId).info("Site: "+site+"\nSitesVisited: "+str(sitesVisited)+", Total Time: "+str(time.time()-startTime))
-    print(sitesToVisit)
-    
+        Logger(threadId).info("Site: "+site+"\nSitesVisited: "+str(sitesVisited)+", Total Time: "+str(time.time()-startTime))    
 
 def main(startingSites):
     pool = Pool(len(startingSites))

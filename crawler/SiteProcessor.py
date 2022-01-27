@@ -21,6 +21,7 @@ chromedriver = '.\crawler\chromedriver.exe'
  
 options = webdriver.ChromeOptions()
 options.add_argument('headless')
+options.add_experimental_option("excludeSwitches", ["enable-logging"])
 browser=webdriver.Chrome(executable_path=chromedriver, chrome_options=options)
 LOGGER.setLevel(logging.WARNING)
 
@@ -57,18 +58,31 @@ class SiteProcessor:
             browser.get(self.sourceSite)
             content = browser.page_source
             soup = BeautifulSoup(content, 'html.parser')
+            
             title = soup.find('title').string
-
             if "404" in title:
                 return None
 
+            # kill all script and style elements
+            for script in soup(["script", "style"]):
+                script.extract()
+
+            text = soup.get_text()
+            unfilteredWords = [word.strip() for word in text.splitlines()]
+            words = []
+            for word in unfilteredWords:
+                if word is None:
+                    continue
+                words.extend(word.split())
+                
             for link in soup.find_all(href=True):
                 if link.has_attr('href'):
                     url = self.siteMatcher.GetFullSiteURL(link['href'], self.sourceSite)
                     if url is not None and url not in self.visitedSites and not Utils.isExcludedFileType(url):
                         self.sitesToVisit.append(url)
                         self.visitedSites[url] = True
-            message = self.CreateSiteMessage(self.sourceSite, title)
+                        
+            message = self.CreateSiteMessage(self.sourceSite, title, words)
             self.PushSiteMessage(message)
         except BaseException as ex:
             self.logger.error("Could not connect to site ["+self.sourceSite+"], Reason="+str(ex))
@@ -78,8 +92,8 @@ class SiteProcessor:
         self.sitesToVisit = []
         return results
 
-    def CreateSiteMessage(self, url, title):
-        return json.dumps({"title": title, "url": url})
+    def CreateSiteMessage(self, url, title, words):
+        return json.dumps({"title": title, "url": url, "words":list(words)})
     
     def PushSiteMessage(self, message):
         try:
