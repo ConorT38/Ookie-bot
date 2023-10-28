@@ -7,6 +7,9 @@ import uuid
 import pika
 from bs4 import BeautifulSoup
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service as ChromeService
+from webdriver_manager.chrome import ChromeDriverManager
+
 from selenium.webdriver.remote.remote_connection import LOGGER
 
 from crawler.SiteMatcher import SiteMatcher
@@ -15,24 +18,25 @@ from crawler.Utils import Utils
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 from log.Logger import Logger
 
+RABBITMQ_USERNAME = "pi"
+RABBITMQ_PASSWORD = "raspberry"
+
 conn_timeout = 6
 read_timeout = 20
-chromedriver = '.\crawler\chromedriver.exe'
  
 options = webdriver.ChromeOptions()
 options.add_argument('headless')
 options.add_experimental_option("excludeSwitches", ["enable-logging"])
-browser=webdriver.Chrome(executable_path=chromedriver, chrome_options=options)
+browser=webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), chrome_options=options)
 LOGGER.setLevel(logging.WARNING)
 
-credentials = pika.PlainCredentials("root","Ae27!6CdJc1_thEQ9")
 connection = None
 channel = None
 
 def CreateAMQPConnection(conn):
     if conn is None or conn.is_closed:
-        credentials = pika.PlainCredentials("root","Ae27!6CdJc1_thEQ9")
-        connection = pika.BlockingConnection(pika.ConnectionParameters('192.168.0.22',5672,'/', credentials))
+        credentials = pika.PlainCredentials(RABBITMQ_USERNAME,RABBITMQ_PASSWORD)
+        connection = pika.BlockingConnection(pika.ConnectionParameters('192.168.0.20',5672,'/', credentials))
         return connection
     return conn
 
