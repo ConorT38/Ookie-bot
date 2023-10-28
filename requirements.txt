@@ -4,4 +4,4 @@ pika==1.2.0
 beautifulsoup4==4.10.0
 selenium==4.1.0
 build==1.0.3
-webdriver-manager=4.0.1
+webdriver-manager==4.0.1
