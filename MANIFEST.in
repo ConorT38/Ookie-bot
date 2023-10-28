@@ -1,0 +1,4 @@
+include requirements.txt
+include ookiebot/*.py
+include ookiebot/crawler/*.py
+include ookiebot/log/*.py
