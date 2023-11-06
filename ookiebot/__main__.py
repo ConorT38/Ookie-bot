@@ -3,6 +3,7 @@ import time
 from .crawler.SiteProcessor import SiteProcessor
 from .log.Logger import Logger
 import sys
+import os
 from pyppeteer import launch
 import asyncio
 from urllib.parse import urlparse
@@ -11,7 +12,14 @@ visitedSites = {}
 async def StartProcessing(startingSite, threadId):
     sitesToVisit = [startingSite]
     sitesVisited = 0
-    browser = await launch()
+    
+    # check if it's windows or linux
+    if os.name == 'nt': 
+        browser = await launch()
+    elif os.name == 'posix':
+        browser = await launch(executablePath='/usr/lib/chromium-browser/chromedriver')
+    else:
+        raise Exception("OS Error: Ookiebot only runs on 'nt' or 'posix' systems.")
 
     while sitesToVisit:
         if not sitesToVisit:
