@@ -3,12 +3,16 @@ import time
 from .crawler.SiteProcessor import SiteProcessor
 from .log.Logger import Logger
 import sys
+from pyppeteer import launch
+import asyncio
 from urllib.parse import urlparse
 
 visitedSites = {}
-def StartProcessing(startingSite, threadId):
+async def StartProcessing(startingSite, threadId):
     sitesToVisit = [startingSite]
     sitesVisited = 0
+    browser = await launch()
+
     while sitesToVisit:
         if not sitesToVisit:
             continue
@@ -16,19 +20,19 @@ def StartProcessing(startingSite, threadId):
         startTime = time.time()
         site = sitesToVisit.pop(0)
 
-        siteProcessor = SiteProcessor(site, visitedSites, threadId)
-        siteProcessor.Process()
+        siteProcessor = SiteProcessor(site,browser, visitedSites, threadId)
+        await siteProcessor.Process()
     
         sitesToVisit.extend(siteProcessor.FlushSitesToVisit())
         sitesVisited += 1
         
         Logger(threadId).info("Site: "+site+"\nSitesVisited: "+str(sitesVisited)+", Total Time: "+str(time.time()-startTime))    
-
-def main(startingSites):
-    pool = Pool(len(startingSites))
+    await browser.close()
+async def main(startingSites):
+    pool = Pool(len(startingSites))    
     try:
         for i in range(len(startingSites)):
-            pool.apply_async(StartProcessing(startingSites[i], "thread-" + str(i)))
+            pool.apply_async(await StartProcessing(startingSites[i], "thread-" + str(i)))
     except KeyboardInterrupt:
         pool.terminate()
         sys.exit(1)
@@ -43,5 +47,5 @@ if __name__ == '__main__':
         if not all([parsedUrl.scheme, parsedUrl.netloc]):
             raise Exception("Inavlid argument. Usage: ookiebot.py <url>")
 
-    main(sys.argv[1:])
+    asyncio.run(main(sys.argv[1:]))
     

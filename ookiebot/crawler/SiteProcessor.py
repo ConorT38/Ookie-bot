@@ -5,11 +5,6 @@ import sys
 
 import pika
 from bs4 import BeautifulSoup
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service as ChromeService
-from webdriver_manager.chrome import ChromeDriverManager
-
-from selenium.webdriver.remote.remote_connection import LOGGER
 
 from ..crawler.SiteMatcher import SiteMatcher
 from ..crawler.Utils import Utils
@@ -22,12 +17,6 @@ RABBITMQ_PASSWORD = "raspberry"
 
 conn_timeout = 6
 read_timeout = 20
- 
-options = webdriver.ChromeOptions()
-options.add_argument('headless')
-options.add_experimental_option("excludeSwitches", ["enable-logging"])
-browser=webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), chrome_options=options)
-LOGGER.setLevel(logging.WARNING)
 
 connection = None
 channel = None
@@ -46,7 +35,7 @@ def CreateSiteChannel(conn):
         return channel
 
 class SiteProcessor:
-    def __init__(self, sourceSite, visitedSites = {}, threadId="main"):
+    def __init__(self, sourceSite, browser, visitedSites = {}, threadId="main"):
         self.visitedSites = visitedSites
         self.sourceSite = sourceSite
         self.sitesToVisit = []
@@ -55,14 +44,28 @@ class SiteProcessor:
         self.siteMatcher = SiteMatcher(threadId)
         self.amqpConnection = CreateAMQPConnection(connection)
         self.channel = CreateSiteChannel(self.amqpConnection)
+        self.browser = browser
 
-    def Process(self, _timeout=(6, 20)):
+    async def Process(self, _timeout=(6, 20)):
         try:
-            browser.get(self.sourceSite)
-            content = browser.page_source
+            
+            page = await self.browser.newPage()
+
+            # Navigate to the URL
+            await page.goto(self.sourceSite)
+
+             # Wait for the page to load and execute JavaScript
+            await page.waitForSelector('head')  # Replace with a suitable selector
+
+            # Extract data from the rendered page
+            content = await page.evaluate('() => document.documentElement.innerHTML')  # Replace with your data extraction logic            
             soup = BeautifulSoup(content, 'html.parser')
             
-            title = soup.find('title').string
+            title = soup.find('title')
+            if title == None:
+                return None
+            
+            title = title.string
             if "404" in title:
                 return None
 
@@ -89,6 +92,7 @@ class SiteProcessor:
             self.PushSiteMessage(message)
         except BaseException as ex:
             self.logger.error("Could not connect to site ["+self.sourceSite+"], Reason="+str(ex))
+            raise ex
             
     def FlushSitesToVisit(self):
         results = self.sitesToVisit
