@@ -12,12 +12,13 @@ visitedSites = {}
 async def StartProcessing(startingSite, threadId):
     sitesToVisit = [startingSite]
     sitesVisited = 0
+    browser = None
     
     # check if it's windows or linux
     if os.name == 'nt': 
         browser = await launch()
     elif os.name == 'posix':
-        browser = await launch(executablePath='/usr/lib/chromium-browser/chromedriver')
+        browser = await launch(headless=True, executablePath="/usr/bin/chromium-browser")
     else:
         raise Exception("OS Error: Ookiebot only runs on 'nt' or 'posix' systems.")
 
@@ -28,7 +29,7 @@ async def StartProcessing(startingSite, threadId):
         startTime = time.time()
         site = sitesToVisit.pop(0)
 
-        siteProcessor = SiteProcessor(site,browser, visitedSites, threadId)
+        siteProcessor = SiteProcessor(site, browser, visitedSites, threadId)
         await siteProcessor.Process()
     
         sitesToVisit.extend(siteProcessor.FlushSitesToVisit())
