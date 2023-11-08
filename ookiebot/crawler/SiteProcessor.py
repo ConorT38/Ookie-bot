@@ -36,7 +36,7 @@ def CreateAMQPConnection(conn):
     """
     if conn is None or conn.is_closed:
         credentials = pika.PlainCredentials(RABBITMQ_USERNAME, RABBITMQ_PASSWORD)
-        connection = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq.home.media', 5672, '/', credentials))
+        connection = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq.home.lan', 5672, '/', credentials))
         return connection
     return conn
 

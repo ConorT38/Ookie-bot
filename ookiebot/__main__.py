@@ -7,6 +7,7 @@ import os
 from pyppeteer import launch
 import asyncio
 from urllib.parse import urlparse
+from pyppeteer.errors import PageError
 
 visitedSites = {}
 
@@ -28,7 +29,7 @@ async def StartProcessing(startingSite, threadId, sitesToVisit=[]):
     if os.name == 'nt':
         browser = await launch()
     elif os.name == 'posix':
-        browser = await launch(headless=True, executablePath="/usr/bin/chromium-browser")
+        browser = await launch(headless=True, executablePath="/usr/bin/chromium", args=['--no-sandbox'])
     else:
         raise Exception("OS Error: Ookiebot only runs on 'nt' or 'posix' systems.")
 
@@ -49,7 +50,7 @@ async def StartProcessing(startingSite, threadId, sitesToVisit=[]):
             Logger(threadId).info("Site: "+site+"\nSitesVisited: "+str(sitesVisited)+", Total Time: "+str(time.time()-startTime))
         except BaseException as ex:
             await browser.close()
-            if type(ex) is TimeoutError:
+            if type(ex) is TimeoutError or type(ex) is PageError:
                 await StartProcessing(sitesToVisit.pop(), threadId, sitesToVisit)
             else:
                 raise ex
