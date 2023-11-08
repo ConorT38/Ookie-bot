@@ -9,11 +9,13 @@ import asyncio
 from urllib.parse import urlparse
 
 visitedSites = {}
-async def StartProcessing(startingSite, threadId):
-    sitesToVisit = [startingSite]
+
+async def StartProcessing(startingSite, threadId, sitesToVisit=[]):
+    if not sitesToVisit:
+        sitesToVisit = [startingSite]
     sitesVisited = 0
     browser = None
-    
+
     # check if it's windows or linux
     if os.name == 'nt': 
         browser = await launch()
@@ -23,22 +25,32 @@ async def StartProcessing(startingSite, threadId):
         raise Exception("OS Error: Ookiebot only runs on 'nt' or 'posix' systems.")
 
     while sitesToVisit:
-        if not sitesToVisit:
-            continue
+        try:
+            if not sitesToVisit:
+                continue
 
-        startTime = time.time()
-        site = sitesToVisit.pop(0)
+            startTime = time.time()
+            site = sitesToVisit.pop(0)
 
-        siteProcessor = SiteProcessor(site, browser, visitedSites, threadId)
-        await siteProcessor.Process()
-    
-        sitesToVisit.extend(siteProcessor.FlushSitesToVisit())
-        sitesVisited += 1
+            siteProcessor = SiteProcessor(site, browser, visitedSites, threadId)
+            await siteProcessor.Process()
         
-        Logger(threadId).info("Site: "+site+"\nSitesVisited: "+str(sitesVisited)+", Total Time: "+str(time.time()-startTime))    
+            sitesToVisit.extend(siteProcessor.FlushSitesToVisit())
+            sitesVisited += 1
+            
+            Logger(threadId).info("Site: "+site+"\nSitesVisited: "+str(sitesVisited)+", Total Time: "+str(time.time()-startTime))
+        except BaseException as ex:
+            await browser.close()
+            if type(ex) is TimeoutError:
+                await StartProcessing(sitesToVisit.pop(), threadId, sitesToVisit)
+            else:
+                raise ex
+
     await browser.close()
+
 async def main(startingSites):
     pool = Pool(len(startingSites))    
+    
     try:
         for i in range(len(startingSites)):
             pool.apply_async(await StartProcessing(startingSites[i], "thread-" + str(i)))

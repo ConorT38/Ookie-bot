@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 import sys
 
@@ -24,7 +23,7 @@ channel = None
 def CreateAMQPConnection(conn):
     if conn is None or conn.is_closed:
         credentials = pika.PlainCredentials(RABBITMQ_USERNAME,RABBITMQ_PASSWORD)
-        connection = pika.BlockingConnection(pika.ConnectionParameters('192.168.0.20',5672,'/', credentials))
+        connection = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq.home.media',5672,'/', credentials))
         return connection
     return conn
 
@@ -48,7 +47,6 @@ class SiteProcessor:
 
     async def Process(self, _timeout=(6, 20)):
         try:
-            
             page = await self.browser.newPage()
 
             # Navigate to the URL
@@ -60,6 +58,9 @@ class SiteProcessor:
             # Extract data from the rendered page
             content = await page.evaluate('() => document.documentElement.innerHTML')  # Replace with your data extraction logic            
             soup = BeautifulSoup(content, 'html.parser')
+
+            self.logger.debug("closing page ["+self.sourceSite+"]")
+            await page.close()
             
             title = soup.find('title')
             if title == None:
