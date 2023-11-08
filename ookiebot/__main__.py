@@ -11,13 +11,21 @@ from urllib.parse import urlparse
 visitedSites = {}
 
 async def StartProcessing(startingSite, threadId, sitesToVisit=[]):
+    """
+    Start the web scraping process for a given starting site and its child sites.
+
+    Args:
+        startingSite (str): The starting site URL.
+        threadId (str): A string representing the thread ID.
+        sitesToVisit (list): A list of sites to visit (default is an empty list).
+    """
     if not sitesToVisit:
         sitesToVisit = [startingSite]
     sitesVisited = 0
     browser = None
 
-    # check if it's windows or linux
-    if os.name == 'nt': 
+    # Check if it's Windows or Linux for launching the browser
+    if os.name == 'nt':
         browser = await launch()
     elif os.name == 'posix':
         browser = await launch(headless=True, executablePath="/usr/bin/chromium-browser")
@@ -34,10 +42,10 @@ async def StartProcessing(startingSite, threadId, sitesToVisit=[]):
 
             siteProcessor = SiteProcessor(site, browser, visitedSites, threadId)
             await siteProcessor.Process()
-        
+
             sitesToVisit.extend(siteProcessor.FlushSitesToVisit())
             sitesVisited += 1
-            
+
             Logger(threadId).info("Site: "+site+"\nSitesVisited: "+str(sitesVisited)+", Total Time: "+str(time.time()-startTime))
         except BaseException as ex:
             await browser.close()
@@ -49,8 +57,14 @@ async def StartProcessing(startingSite, threadId, sitesToVisit=[]):
     await browser.close()
 
 async def main(startingSites):
-    pool = Pool(len(startingSites))    
-    
+    """
+    Main entry point for starting the web scraping process.
+
+    Args:
+        startingSites (list): A list of starting site URLs.
+    """
+    pool = Pool(len(startingSites))
+
     try:
         for i in range(len(startingSites)):
             pool.apply_async(await StartProcessing(startingSites[i], "thread-" + str(i)))
@@ -62,11 +76,10 @@ async def main(startingSites):
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        raise Exception("Inavlid argument. Usage: ookiebot.py <url>")
+        raise Exception("Invalid argument. Usage: ookiebot.py <url>")
     for arg in sys.argv[1:]:
         parsedUrl = urlparse(str(arg))
         if not all([parsedUrl.scheme, parsedUrl.netloc]):
-            raise Exception("Inavlid argument. Usage: ookiebot.py <url>")
+            raise Exception("Invalid argument. Usage: ookiebot.py <url>")
 
     asyncio.run(main(sys.argv[1:]))
-    
